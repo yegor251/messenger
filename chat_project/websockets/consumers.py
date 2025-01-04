@@ -27,6 +27,48 @@ class ChatConsumer(AsyncWebsocketConsumer):
         action = data.get('action')
         if action == 'send_message':
             await self.handle_send_message(data)
+        elif action == 'mark_as_read':
+            await self.mark_as_read(data)
+
+    async def mark_as_read(self, data):
+        recipient_username = data.get("recipient")
+
+        if not recipient_username:
+            await self.send(json.dumps({"error": "Recipient username is required"}))
+            return
+
+        try:
+            recipient = await sync_to_async(User.objects.get)(username=recipient_username)
+        except User.DoesNotExist:
+            await self.send(json.dumps({"error": "Recipient not found"}))
+            return
+
+        updated_messages = await sync_to_async(Message.objects.filter(
+            sender_id=recipient.user_id,
+            recipient_id=self.user.user_id,
+            is_read=False
+        ).update)(is_read=True)
+
+        if updated_messages > 0:
+            channel_layer = get_channel_layer()
+            sender_group_name = f"user_{recipient.user_id}"
+            await channel_layer.group_send(
+                sender_group_name,
+                {
+                    "type": "mark_as_read_event",
+                    "message": {
+                        "action": "mark_as_read",
+                        "reader": self.user.username,
+                    },
+                },
+            )
+
+    async def mark_as_read_event(self, event):
+        await self.send(json.dumps({
+            "action": "mark_as_read",
+            "data": event["message"]
+        }))
+
 
     async def handle_send_message(self, data):
         sender = self.user
