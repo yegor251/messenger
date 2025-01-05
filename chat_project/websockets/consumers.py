@@ -29,6 +29,26 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.handle_send_message(data)
         elif action == 'mark_as_read':
             await self.mark_as_read(data)
+        elif action == 'check_username':
+            await self.check_username(data)
+
+    async def check_username(self, data):
+        username_to_check = data.get("username")
+        if not username_to_check:
+            await self.send(json.dumps({"error": "Username is required"}))
+            return
+
+        user_exists = await sync_to_async(User.objects.filter(username=username_to_check).exists)()
+
+        response = {
+            "action": "check_username",
+            "data": {
+                "username": username_to_check,
+                "exists": user_exists,
+            },
+        }
+        print(response)
+        await self.send(json.dumps(response))
 
     async def mark_as_read(self, data):
         recipient_username = data.get("recipient")

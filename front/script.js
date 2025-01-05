@@ -68,6 +68,11 @@ class ChatApp {
             this.handleIncomingChatMessage(data.data);
         } else if (data.action === 'mark_as_read') {
             this.handleMarkAsRead(data.data);
+        } else if (data.action === 'check_username') {
+            if (data.data.exists) {
+                this.addChat(data.data.username);
+            } else
+                alert('User not exist');
         }
     }
 
@@ -175,7 +180,10 @@ class ChatApp {
         if (e.key === 'Enter') {
             const chatName = e.target.value.trim();
             if (chatName) {
-                this.addChat(chatName);
+                this.socket.send(JSON.stringify({
+                    action: 'check_username',
+                    username: chatName,
+                }));
                 e.target.value = '';
                 e.target.style.display = 'none';
             }
